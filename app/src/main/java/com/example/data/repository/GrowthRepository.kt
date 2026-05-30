@@ -53,11 +53,20 @@ class GrowthRepository(
         
         // Feed in default habits so the new child isn't blank
         val defaultHabits = listOf(
-            "按时起床",
-            "认真完成作业",
-            "课外阅读 30分钟",
-            "积极体育运动",
-            "晚上九点早睡"
+            "准时起床",
+            "穿衣洗漱",
+            "早餐不挑食",
+            "上学不迟到",
+            "上课认真",
+            "午餐不挑食",
+            "午休不捣乱",
+            "上课认真",
+            "运动锻炼",
+            "自主学习",
+            "晚餐不挑食",
+            "帮忙做家务",
+            "陪妹妹玩",
+            "按时睡觉"
         )
         defaultHabits.forEachIndexed { idx, hName ->
             habitItemDao.insertHabit(HabitItem(childId = id, name = hName, orderIndex = idx))
@@ -137,11 +146,20 @@ class GrowthRepository(
             val defaultId = profileDao.insertOrUpdateProfile(ChildProfile(id = 1, name = "小明", goal = "掌握生活好习惯，健康快乐成长")).toInt()
             
             val defaults = listOf(
-                "按时起床",
-                "认真完成作业",
-                "课外阅读 30分钟",
-                "积极体育运动",
-                "晚上九点早睡"
+                "准时起床",
+                "穿衣洗漱",
+                "早餐不挑食",
+                "上学不迟到",
+                "上课认真",
+                "午餐不挑食",
+                "午休不捣乱",
+                "上课认真",
+                "运动锻炼",
+                "自主学习",
+                "晚餐不挑食",
+                "帮忙做家务",
+                "陪妹妹玩",
+                "按时睡觉"
             )
             defaults.forEachIndexed { idx, name ->
                 habitItemDao.insertHabit(HabitItem(childId = defaultId, name = name, orderIndex = idx))
