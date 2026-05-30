@@ -44,6 +44,11 @@ import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
+enum class GrowthScreen {
+    MAIN,
+    SETTINGS
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainGrowthScreen(
@@ -75,6 +80,8 @@ fun MainGrowthScreen(
     var habitToEdit by remember { mutableStateOf<HabitItem?>(null) }
     var showHabitActionsDialog by remember { mutableStateOf(false) }
 
+    var currentScreen by remember { mutableStateOf(GrowthScreen.MAIN) }
+
     // Precalculate completed record lookup map: "habitId_date" -> Boolean
     val completedKeysMap = remember(allRecords) {
         allRecords.associate { "${it.habitId}_${it.date}" to true }
@@ -82,122 +89,324 @@ fun MainGrowthScreen(
 
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        text = "儿 童 成 长 表 现 记 录",
-                        fontWeight = FontWeight.Bold,
-                        color = Rose800,
-                        fontSize = 18.sp
-                    )
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Rose50
-                ),
-                modifier = Modifier.clip(RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp))
-            )
+            if (currentScreen == GrowthScreen.MAIN) {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Text(
+                            text = "儿 童 成 长 表 现 记 录",
+                            fontWeight = FontWeight.Bold,
+                            color = Rose800,
+                            fontSize = 18.sp
+                        )
+                    },
+                    actions = {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Rose200.copy(alpha = 0.5f))
+                                .clickable { viewModel.completeAllToday() }
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text("🌸 一键今日", fontSize = 12.sp, color = Rose800, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(onClick = { currentScreen = GrowthScreen.SETTINGS }) {
+                            Icon(Icons.Default.Settings, contentDescription = "设置与管理", tint = Rose600)
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = Rose50
+                    ),
+                    modifier = Modifier.clip(RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp))
+                )
+            } else {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Text(
+                            text = "设 置 与 管 理",
+                            fontWeight = FontWeight.Bold,
+                            color = Rose800,
+                            fontSize = 18.sp
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { currentScreen = GrowthScreen.MAIN }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "返回主页", tint = Rose600)
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = Rose50
+                    ),
+                    modifier = Modifier.clip(RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp))
+                )
+            }
         },
         containerColor = WarmIvory,
         modifier = modifier
     ) { innerPadding ->
-        LazyColumn(
+        AnimatedContent(
+            targetState = currentScreen,
+            transitionSpec = {
+                if (targetState == GrowthScreen.SETTINGS) {
+                    (slideInHorizontally { width -> width } + fadeIn()).togetherWith(
+                        slideOutHorizontally { width -> -width } + fadeOut()
+                    )
+                } else {
+                    (slideInHorizontally { width -> -width } + fadeIn()).togetherWith(
+                        slideOutHorizontally { width -> width } + fadeOut()
+                    )
+                }
+            },
+            label = "ScreenTransition",
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            // 1. Child Info & Big Flower Scoreboard card
-            item {
-                ChildProfileCard(
-                    profile = childProfile,
-                    totalFlowers = totalFlowers,
-                    onEditClick = { showProfileEditDialog = true },
-                    onManageClick = { showChildrenManagementDialog = true }
-                )
-            }
+                .padding(innerPadding)
+        ) { screen ->
+            when (screen) {
+                GrowthScreen.MAIN -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(20.dp)
+                    ) {
+                        // 1. Child Info & Big Flower Scoreboard card
+                        item {
+                            ChildProfileCard(
+                                profile = childProfile,
+                                totalFlowers = totalFlowers,
+                                onEditClick = { currentScreen = GrowthScreen.SETTINGS },
+                                onManageClick = { currentScreen = GrowthScreen.SETTINGS }
+                            )
+                        }
 
-            // 2. Weekly Daily Records Grid (Core)
-            item {
-                WeeklyRecordsGrid(
-                    activeHabits = activeHabits,
-                    weekDates = activeWeekDates,
-                    selectedMonday = selectedWeekMonday,
-                    completedKeysMap = completedKeysMap,
-                    onCellToggle = { habitId, date, completed ->
-                        viewModel.toggleDailyRecord(habitId, date, completed)
-                    },
-                    onHabitClick = { habit ->
-                        habitToEdit = habit
-                        showHabitActionsDialog = true
-                    },
-                    onPrevWeek = { viewModel.selectPreviousWeek() },
-                    onNextWeek = { viewModel.selectNextWeek() },
-                    onCurrentWeek = { viewModel.selectCurrentWeek() },
-                    onAddHabitClick = { showAddHabitDialog = true }
-                )
-            }
+                        // 1.5 Quick Action Banner for today's habits
+                        item {
+                            Card(
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = Rose50),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                                border = BorderStroke(1.2.dp, Rose100),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { viewModel.completeAllToday() }
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                                        .fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Text("🌸", fontSize = 24.sp)
+                                        Column {
+                                            Text(
+                                                text = "一键标上今日所有花朵",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp,
+                                                color = Rose800
+                                            )
+                                            Text(
+                                                text = "今天表现很棒？快来帮全部习惯浇水开花吧！",
+                                                fontSize = 11.sp,
+                                                color = Slate400
+                                            )
+                                        }
+                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = "一键打卡",
+                                        tint = Rose600,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+                        }
 
-            // 3. Habit Project Management Card
-            item {
-                HabitManagementCard(
-                    activeHabits = activeHabits,
-                    onAddHabit = { viewModel.addHabit(it) },
-                    onEditHabit = { habit ->
-                        habitToEdit = habit
-                        showHabitActionsDialog = true
+                        // 2. Weekly Daily Records Grid (Core)
+                        item {
+                            WeeklyRecordsGrid(
+                                activeHabits = activeHabits,
+                                weekDates = activeWeekDates,
+                                selectedMonday = selectedWeekMonday,
+                                completedKeysMap = completedKeysMap,
+                                onCellToggle = { habitId, date, completed ->
+                                    viewModel.toggleDailyRecord(habitId, date, completed)
+                                },
+                                onHabitClick = { habit ->
+                                    habitToEdit = habit
+                                    showHabitActionsDialog = true
+                                },
+                                onPrevWeek = { viewModel.selectPreviousWeek() },
+                                onNextWeek = { viewModel.selectNextWeek() },
+                                onCurrentWeek = { viewModel.selectCurrentWeek() },
+                                onAddHabitClick = { showAddHabitDialog = true }
+                            )
+                        }
+
+                        // 3. Data Statistics Module (Weekly / Monthly breakdown)
+                        item {
+                            StatisticsCard(
+                                activeHabits = activeHabits,
+                                allRecords = allRecords,
+                                activeWeekDates = activeWeekDates,
+                                selectedStatsMonth = selectedStatsMonth,
+                                onPrevMonth = { viewModel.selectPreviousStatsMonth() },
+                                onNextMonth = { viewModel.selectNextStatsMonth() },
+                                onCurrentMonth = { viewModel.selectCurrentStatsMonth() }
+                            )
+                        }
+
+                        // A tiny friendly footer displaying soft cartoon vibes
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "让好习惯像花朵一样生机勃勃 💐",
+                                    color = EarthyText.copy(alpha = 0.5f),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
                     }
-                )
-            }
+                }
+                GrowthScreen.SETTINGS -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(20.dp)
+                    ) {
+                        // 1. Child Selection & Management Card
+                        item {
+                            Card(
+                                shape = RoundedCornerShape(24.dp),
+                                colors = CardDefaults.cardColors(containerColor = SoftCardWhite),
+                                border = BorderStroke(1.2.dp, Rose100),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .width(6.dp)
+                                                .height(18.dp)
+                                                .background(FlowerCoral, RoundedCornerShape(50.dp))
+                                        )
+                                        Text(
+                                            text = "孩子管理与切换",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp,
+                                            color = Slate700
+                                        )
+                                    }
 
-            // 4. Data Statistics Module (Weekly / Monthly breakdown)
-            item {
-                StatisticsCard(
-                    activeHabits = activeHabits,
-                    allRecords = allRecords,
-                    activeWeekDates = activeWeekDates,
-                    selectedStatsMonth = selectedStatsMonth,
-                    onPrevMonth = { viewModel.selectPreviousStatsMonth() },
-                    onNextMonth = { viewModel.selectNextStatsMonth() },
-                    onCurrentMonth = { viewModel.selectCurrentStatsMonth() }
-                )
-            }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "当前孩子: ${childProfile?.name ?: "未设置"}",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 16.sp,
+                                                color = Rose800
+                                            )
+                                            Text(
+                                                text = "成长目标: ${childProfile?.goal ?: "无"}",
+                                                fontSize = 12.sp,
+                                                color = Slate400
+                                            )
+                                        }
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Button(
+                                                onClick = { showProfileEditDialog = true },
+                                                colors = ButtonDefaults.buttonColors(containerColor = FlowerCoral),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                            ) {
+                                                Text("编辑目标", color = WarmIvory, fontSize = 11.sp)
+                                            }
+                                            Button(
+                                                onClick = { showChildrenManagementDialog = true },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Rose600),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                            ) {
+                                                Text("切换/新建", color = WarmIvory, fontSize = 11.sp)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
 
-            // 5. Reward/Punishment Rules Card
-            item {
-                RulesCard(
-                    rules = rules,
-                    onEditClick = { showRulesEditDialog = true }
-                )
-            }
+                        // 2. Habit Project Management Card
+                        item {
+                            HabitManagementCard(
+                                activeHabits = activeHabits,
+                                onAddHabit = { viewModel.addHabit(it) },
+                                onEditHabit = { habit ->
+                                    habitToEdit = habit
+                                    showHabitActionsDialog = true
+                                }
+                            )
+                        }
 
-            // 6. WebDAV Cloud Synchronization Card
-            item {
-                WebDavSyncCard(
-                    settings = webDavSettings,
-                    isSyncing = isSyncing,
-                    syncStatusMsg = syncStatusMsg,
-                    onSaveSettings = { viewModel.saveWebDavSettings(it) },
-                    onBackup = { viewModel.performWebDavBackup() },
-                    onRestore = { viewModel.performWebDavRestore() },
-                    onSmartSync = { viewModel.performWebDavSmartSync() }
-                )
-            }
+                        // 3. Reward/Punishment Rules Card
+                        item {
+                            RulesCard(
+                                rules = rules,
+                                onEditClick = { showRulesEditDialog = true }
+                            )
+                        }
 
-            // A tiny friendly footer displaying soft cartoon vibes
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "让好习惯像花朵一样生机勃勃 💐",
-                        color = EarthyText.copy(alpha = 0.5f),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                        // 4. WebDAV Cloud Synchronization Card
+                        item {
+                            WebDavSyncCard(
+                                settings = webDavSettings,
+                                isSyncing = isSyncing,
+                                syncStatusMsg = syncStatusMsg,
+                                onSaveSettings = { viewModel.saveWebDavSettings(it) },
+                                onBackup = { viewModel.performWebDavBackup() },
+                                onRestore = { viewModel.performWebDavRestore() },
+                                onSmartSync = { viewModel.performWebDavSmartSync() }
+                            )
+                        }
+
+                        // Friendly Hint Footer
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "设置已自动保存 ✏️",
+                                    color = EarthyText.copy(alpha = 0.5f),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

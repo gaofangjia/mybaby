@@ -198,6 +198,15 @@ class GrowthViewModel(
         }
     }
 
+    fun completeAllToday() {
+        viewModelScope.launch {
+            val dateStr = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+            activeHabits.value.forEach { habit ->
+                repository.toggleRecord(habit.id, dateStr, true)
+            }
+        }
+    }
+
     fun updateRules(rewardRule: String, punishRule: String) {
         viewModelScope.launch {
             repository.updateRules(_selectedChildId.value, rewardRule, punishRule)
