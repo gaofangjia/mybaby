@@ -1,0 +1,6 @@
+{
+  "name": "儿童成长表现记录",
+  "description": "亲子工具类应用，家长用来记录孩子每日行为习惯、成长表现，以小红花积分作为激励，支持习惯管理、每日表现（周视图）、数据统计和自主规章设置。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
