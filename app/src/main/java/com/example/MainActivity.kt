@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Initialize Core Room Database, Repository, and ViewModel Factory
+        // Initialize Core Room Database, Repository, WebDAV Sync, and ViewModel Factory
         val database = AppDatabase.getDatabase(applicationContext)
         val repository = GrowthRepository(
             profileDao = database.profileDao(),
@@ -27,7 +27,8 @@ class MainActivity : ComponentActivity() {
             dailyRecordDao = database.dailyRecordDao(),
             ruleDao = database.ruleDao()
         )
-        val factory = GrowthViewModelFactory(repository)
+        val syncManager = com.example.data.sync.WebDavSyncManager(applicationContext, repository)
+        val factory = GrowthViewModelFactory(repository, syncManager)
 
         enableEdgeToEdge()
         setContent {

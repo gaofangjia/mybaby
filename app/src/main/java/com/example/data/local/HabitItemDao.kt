@@ -10,14 +10,17 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface HabitItemDao {
-    @Query("SELECT * FROM habit_items WHERE isDeleted = 0 ORDER BY orderIndex ASC, id ASC")
-    fun getActiveHabitsFlow(): Flow<List<HabitItem>>
+    @Query("SELECT * FROM habit_items WHERE isDeleted = 0 AND childId = :childId ORDER BY orderIndex ASC, id ASC")
+    fun getActiveHabitsFlow(childId: Int): Flow<List<HabitItem>>
+
+    @Query("SELECT * FROM habit_items WHERE childId = :childId ORDER BY orderIndex ASC, id ASC")
+    suspend fun getAllHabitsDirect(childId: Int): List<HabitItem>
 
     @Query("SELECT * FROM habit_items ORDER BY orderIndex ASC, id ASC")
-    suspend fun getAllHabitsDirect(): List<HabitItem>
+    suspend fun getAllHabitsGloballyDirect(): List<HabitItem>
 
-    @Query("SELECT * FROM habit_items WHERE isDeleted = 0 ORDER BY orderIndex ASC, id ASC")
-    suspend fun getActiveHabitsDirect(): List<HabitItem>
+    @Query("SELECT * FROM habit_items WHERE isDeleted = 0 AND childId = :childId ORDER BY orderIndex ASC, id ASC")
+    suspend fun getActiveHabitsDirect(childId: Int): List<HabitItem>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertHabit(habit: HabitItem): Long

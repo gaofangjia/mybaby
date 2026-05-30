@@ -9,6 +9,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -54,6 +56,12 @@ fun MainGrowthScreen(
     val rules by viewModel.rules.collectAsStateWithLifecycle()
     val totalFlowers by viewModel.totalFlowersCount.collectAsStateWithLifecycle()
 
+    val selectedChildId by viewModel.selectedChildId.collectAsStateWithLifecycle()
+    val allProfiles by viewModel.allProfiles.collectAsStateWithLifecycle()
+    val webDavSettings by viewModel.webDavSettings.collectAsStateWithLifecycle()
+    val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
+    val syncStatusMsg by viewModel.syncStatusMsg.collectAsStateWithLifecycle()
+
     val activeWeekDates by viewModel.activeWeekDates.collectAsStateWithLifecycle()
     val selectedWeekMonday by viewModel.selectedWeekMonday.collectAsStateWithLifecycle()
     val selectedStatsMonth by viewModel.selectedStatsMonth.collectAsStateWithLifecycle()
@@ -61,6 +69,7 @@ fun MainGrowthScreen(
     var showProfileEditDialog by remember { mutableStateOf(false) }
     var showRulesEditDialog by remember { mutableStateOf(false) }
     var showAddHabitDialog by remember { mutableStateOf(false) }
+    var showChildrenManagementDialog by remember { mutableStateOf(false) }
 
     // Clicked habit states for edit/delete dialog
     var habitToEdit by remember { mutableStateOf<HabitItem?>(null) }
@@ -103,7 +112,8 @@ fun MainGrowthScreen(
                 ChildProfileCard(
                     profile = childProfile,
                     totalFlowers = totalFlowers,
-                    onEditClick = { showProfileEditDialog = true }
+                    onEditClick = { showProfileEditDialog = true },
+                    onManageClick = { showChildrenManagementDialog = true }
                 )
             }
 
@@ -161,6 +171,19 @@ fun MainGrowthScreen(
                 )
             }
 
+            // 6. WebDAV Cloud Synchronization Card
+            item {
+                WebDavSyncCard(
+                    settings = webDavSettings,
+                    isSyncing = isSyncing,
+                    syncStatusMsg = syncStatusMsg,
+                    onSaveSettings = { viewModel.saveWebDavSettings(it) },
+                    onBackup = { viewModel.performWebDavBackup() },
+                    onRestore = { viewModel.performWebDavRestore() },
+                    onSmartSync = { viewModel.performWebDavSmartSync() }
+                )
+            }
+
             // A tiny friendly footer displaying soft cartoon vibes
             item {
                 Box(
@@ -182,9 +205,188 @@ fun MainGrowthScreen(
 
     // --- DIALOGS ---
 
+    // Children Profiles Management Dialog
+    if (showChildrenManagementDialog) {
+        var newKidName by remember { mutableStateOf("") }
+        var newKidGoal by remember { mutableStateOf("") }
+
+        Dialog(onDismissRequest = { showChildrenManagementDialog = false }) {
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = SoftCardWhite),
+                border = BorderStroke(1.5.dp, Rose200),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(20.dp)
+                        .fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = "👧 切换 / 管理宝贝档案",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Rose800
+                    )
+
+                    Text(
+                        text = "已有宝贝成员:",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = EarthyText
+                    )
+
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 160.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        allProfiles.forEach { profile ->
+                            val isActive = profile.id == selectedChildId
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (isActive) Rose50 else Color.White)
+                                    .border(
+                                        width = if (isActive) 1.5.dp else 0.8.dp,
+                                        color = if (isActive) Rose200 else SoftGreyBorder,
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .clickable {
+                                        viewModel.selectChild(profile.id)
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(text = "👦", fontSize = 16.sp)
+                                    Column {
+                                        Text(
+                                            text = profile.name,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = if (isActive) Rose800 else EarthyText
+                                        )
+                                        if (profile.goal.isNotBlank()) {
+                                            Text(
+                                                text = profile.goal,
+                                                fontSize = 11.sp,
+                                                color = Slate400,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    if (isActive) {
+                                        Text(
+                                            text = "当前使用 🌟",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Rose600
+                                        )
+                                    }
+
+                                    if (allProfiles.size > 1) {
+                                        IconButton(
+                                            onClick = {
+                                                viewModel.deleteChild(profile.id)
+                                            },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Delete,
+                                                contentDescription = "删除该宝贝",
+                                                tint = Color.Red.copy(alpha = 0.6f),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = SoftGreyBorder, thickness = 1.dp)
+
+                    Text(
+                        text = "✨ 添加新宝贝档案:",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = EarthyText
+                    )
+
+                    OutlinedTextField(
+                        value = newKidName,
+                        onValueChange = { newKidName = it },
+                        label = { Text("新宝贝姓名", fontSize = 12.sp) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Rose600,
+                            focusedLabelColor = Rose600
+                        ),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = newKidGoal,
+                        onValueChange = { newKidGoal = it },
+                        label = { Text("成长心愿 (可选)", fontSize = 12.sp) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Rose600,
+                            focusedLabelColor = Rose600
+                        ),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Button(
+                        onClick = {
+                            if (newKidName.isNotBlank()) {
+                                viewModel.addChild(newKidName, newKidGoal)
+                                newKidName = ""
+                                newKidGoal = ""
+                            }
+                        },
+                        enabled = newKidName.isNotBlank(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Rose600),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("添加并切换至该宝贝 🍼", color = WarmIvory, fontSize = 13.sp)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { showChildrenManagementDialog = false }) {
+                            Text("关闭", color = Rose800, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Edit Child Profile Dialog
     if (showProfileEditDialog) {
-        val currentProfile = childProfile ?: ChildProfile()
+        val currentProfile = childProfile ?: ChildProfile(name = "")
         var tempName by remember { mutableStateOf(currentProfile.name) }
         var tempGoal by remember { mutableStateOf(currentProfile.goal) }
 
@@ -483,9 +685,10 @@ fun MainGrowthScreen(
 fun ChildProfileCard(
     profile: ChildProfile?,
     totalFlowers: Int,
-    onEditClick: () -> Unit
+    onEditClick: () -> Unit,
+    onManageClick: () -> Unit
 ) {
-    val currentProfile = profile ?: ChildProfile()
+    val currentProfile = profile ?: ChildProfile(name = "")
 
     Card(
         shape = RoundedCornerShape(24.dp),
@@ -524,7 +727,7 @@ fun ChildProfileCard(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
                             text = currentProfile.name,
@@ -540,6 +743,24 @@ fun ChildProfileCard(
                                 .size(14.dp)
                                 .clickable { onEditClick() }
                         )
+
+                        Spacer(modifier = Modifier.width(4.dp))
+
+                        // Switch/manage badge
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Rose200.copy(alpha = 0.5f))
+                                .clickable { onManageClick() }
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "切换 🔄",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Rose800
+                            )
+                        }
                     }
 
                     Text(
@@ -1345,6 +1566,274 @@ fun RulesCard(
                     color = Slate700,
                     lineHeight = 18.sp
                 )
+            }
+        }
+    }
+}
+
+// 6. WebDAV Cloud Sync Card
+@Composable
+fun WebDavSyncCard(
+    settings: com.example.data.sync.SyncSettings,
+    isSyncing: Boolean,
+    syncStatusMsg: String,
+    onSaveSettings: (com.example.data.sync.SyncSettings) -> Unit,
+    onBackup: () -> Unit,
+    onRestore: () -> Unit,
+    onSmartSync: () -> Unit
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+    var urlInput by remember(settings.url) { mutableStateOf(settings.url) }
+    var usernameInput by remember(settings.username) { mutableStateOf(settings.username) }
+    var passwordInput by remember(settings.password) { mutableStateOf(settings.password) }
+    var fileNameInput by remember(settings.fileName) { mutableStateOf(settings.fileName) }
+    var showConfirmRestoreDialog by remember { mutableStateOf(false) }
+
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = SoftCardWhite),
+        border = BorderStroke(1.2.dp, Sky100),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Header clickable toggle
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("☁️", fontSize = 20.sp)
+                    Column {
+                        Text(
+                            text = "WebDAV 云端同步与备份",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = EarthyText
+                        )
+                        Text(
+                            text = "上次同步: ${settings.lastSyncTime}",
+                            fontSize = 11.sp,
+                            color = Slate400
+                        )
+                    }
+                }
+                IconButton(onClick = { isExpanded = !isExpanded }) {
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = "展开配置",
+                        tint = Slate400
+                    )
+                }
+            }
+
+            // Sync Status Banner
+            if (syncStatusMsg.isNotBlank()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Sky50, RoundedCornerShape(12.dp))
+                        .border(0.8.dp, Sky400, RoundedCornerShape(12.dp))
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = syncStatusMsg,
+                        fontSize = 12.sp,
+                        color = Sky700,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
+            // Config Form
+            if (isExpanded) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "⚙️ 配置 WebDAV 服务器",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = EarthyText
+                    )
+
+                    OutlinedTextField(
+                        value = urlInput,
+                        onValueChange = { urlInput = it },
+                        label = { Text("WebDAV 服务器网址 (如坚果云: https://dav.jianguoyun.com/dav/ )", fontSize = 11.sp) },
+                        placeholder = { Text("https://example.com/dav/", fontSize = 12.sp) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Sky600,
+                            focusedLabelColor = Sky600
+                        ),
+                        singleLine = true,
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = usernameInput,
+                        onValueChange = { usernameInput = it },
+                        label = { Text("账号 / 邮箱", fontSize = 11.sp) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Sky600,
+                            focusedLabelColor = Sky600
+                        ),
+                        singleLine = true,
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = passwordInput,
+                        onValueChange = { passwordInput = it },
+                        label = { Text("应用授权密码", fontSize = 11.sp) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Sky600,
+                            focusedLabelColor = Sky600
+                        ),
+                        singleLine = true,
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = fileNameInput,
+                        onValueChange = { fileNameInput = it },
+                        label = { Text("备份文件名", fontSize = 11.sp) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Sky600,
+                            focusedLabelColor = Sky600
+                        ),
+                        singleLine = true,
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Button(
+                        onClick = {
+                            val updated = com.example.data.sync.SyncSettings(
+                                url = urlInput,
+                                username = usernameInput,
+                                password = passwordInput,
+                                fileName = fileNameInput.ifBlank { "child_growth_backup.json" },
+                                lastSyncTime = settings.lastSyncTime
+                            )
+                            onSaveSettings(updated)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Sky600),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("保存同步配置 💾", color = WarmIvory, fontSize = 13.sp)
+                    }
+
+                    HorizontalDivider(color = Slate400.copy(alpha = 0.3f), thickness = 1.dp)
+                }
+            }
+
+            // Sync Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = onSmartSync,
+                    enabled = !isSyncing && settings.url.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Sky600),
+                    modifier = Modifier.weight(1.3f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "同步",
+                        modifier = Modifier.size(16.dp),
+                        tint = WarmIvory
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("智能双向同步", fontSize = 12.sp, color = WarmIvory)
+                }
+
+                Button(
+                    onClick = onBackup,
+                    enabled = !isSyncing && settings.url.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = SoftGreyBorder),
+                    border = BorderStroke(1.dp, Slate400),
+                    modifier = Modifier.weight(1.1f)
+                ) {
+                    Text("备份上云", fontSize = 12.sp, color = Slate700)
+                }
+
+                Button(
+                    onClick = { showConfirmRestoreDialog = true },
+                    enabled = !isSyncing && settings.url.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Rose100.copy(alpha = 0.6f)),
+                    border = BorderStroke(1.dp, Rose200),
+                    modifier = Modifier.weight(1.1f)
+                ) {
+                    Text("覆盖恢复", fontSize = 12.sp, color = Color(0xFFC92A2A))
+                }
+            }
+        }
+    }
+
+    if (showConfirmRestoreDialog) {
+        Dialog(onDismissRequest = { showConfirmRestoreDialog = false }) {
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = SoftCardWhite),
+                border = BorderStroke(1.5.dp, Rose200),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = "⚠️ 极其重要警告",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFC92A2A)
+                    )
+
+                    Text(
+                        text = "「覆盖恢复」将会彻底清空本地目前的全部宝贝档案及记录，并拉取云端备份来完全覆盖！此操作不可逆。建议您首选使用「智能双向同步」来合并数据。\n\n确实要继续「覆盖恢复」吗？",
+                        fontSize = 14.sp,
+                        color = EarthyText,
+                        lineHeight = 20.sp
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(onClick = { showConfirmRestoreDialog = false }) {
+                            Text("取消", color = EarthyText.copy(alpha = 0.6f))
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                showConfirmRestoreDialog = false
+                                onRestore()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC92A2A))
+                        ) {
+                            Text("确定覆盖恢复", color = WarmIvory)
+                        }
+                    }
+                }
             }
         }
     }

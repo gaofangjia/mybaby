@@ -11,7 +11,7 @@ import com.example.data.model.Rule
 
 @Database(
     entities = [ChildProfile::class, HabitItem::class, DailyRecord::class, Rule::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
